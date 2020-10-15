@@ -2,6 +2,7 @@
 using UnityEngine;
 using System.IO;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Revivd {
     public class ControlPanel : MonoBehaviour {
@@ -16,6 +17,7 @@ namespace Revivd {
         public Spheres spheres;
         public Styles style;
         public Advanced advanced;
+        public PlayerAnimSettings playerAnimSettings;
 
 #pragma warning disable 0649
         [SerializeField] Button load;
@@ -125,6 +127,23 @@ namespace Revivd {
             public AssetBundle[] assetBundles = new AssetBundle[0];
             public PathAttribute[] pathAttributes = new PathAttribute[0];
             public AtomAttribute[] atomAttributes = new AtomAttribute[0];
+
+            public class PlayerAnimationAttributes {
+                public float widthMultiplier;
+                public Color colorStart = Color.Blue;
+                public Color colorEnd = Color.Blue;
+                public Vector3D posOffset;
+                public bool showPaddle = true;
+                public int paddlePos1;
+                public int paddlePos2;
+            }
+
+            public string CSVfilesPath;
+            public string VideoFilesPath;
+            public float playersecondsBetweenUpdates;
+            public float ballsecondsBetweenUpdates;
+            public PlayerAnimationAttributes[] playerAnimationAttributes = new PlayerAnimationAttributes[0];
+
         };
 
         public static Vector3 LDVector3_to_Vector3(ControlPanel.JsonData.Vector3D vector3D) {
@@ -177,6 +196,7 @@ namespace Revivd {
             spheres.gameObject.SetActive(true);
             style.gameObject.SetActive(true);
             advanced.gameObject.SetActive(true);
+            playerAnimSettings.gameObject.SetActive(false);
             load.interactable = true;
             export.interactable = true;
 
@@ -598,5 +618,33 @@ namespace Revivd {
             _instance = this;
         }
 
+        // Sets the values related to the Animation in the UI depending of the players in the scene
+        public void InitiateAnimationUIValues(int player) {
+            PlayerAnim playerAnim = playerAnimSettings.player1Anim.GetComponent<PlayerAnim>();
+            PlayerAnimation playAnim = PlayerAnimation.Instance;
+            List<Color> colors = new List<Color>() { Color.red, Color.green, Color.blue };
+            if (player == 1) {
+                playerAnim.lineWidth.text = "" + playAnim.linesWidth[0];
+                playerAnim.startColor.value = colors.IndexOf(playAnim.p1Colors[0]);
+                playerAnim.endColor.value = colors.IndexOf(playAnim.p1Colors[1]);
+                playerAnim.posOffset_x.text = "" + playAnim.posOffset[0].x;
+                playerAnim.posOffset_y.text = "" + playAnim.posOffset[0].y;
+                playerAnim.posOffset_z.text = "" + playAnim.posOffset[0].z;
+                playerAnim.showPaddle.isOn = playAnim.showPaddle[0];
+                playerAnim.paddlePos1.text = "" + playAnim.paddlePos[0, 0];
+                playerAnim.paddlePos2.text = "" + playAnim.paddlePos[0, 1];
+            }
+            else {
+                playerAnim.lineWidth.text = "" + playAnim.linesWidth[1];
+                playerAnim.startColor.value = colors.IndexOf(playAnim.p2Colors[0]);
+                playerAnim.endColor.value = colors.IndexOf(playAnim.p2Colors[1]);
+                playerAnim.posOffset_x.text = "" + playAnim.posOffset[1].x;
+                playerAnim.posOffset_y.text = "" + playAnim.posOffset[1].y;
+                playerAnim.posOffset_z.text = "" + playAnim.posOffset[1].z;
+                playerAnim.showPaddle.isOn = playAnim.showPaddle[1];
+                playerAnim.paddlePos1.text = "" + playAnim.paddlePos[1, 0];
+                playerAnim.paddlePos2.text = "" + playAnim.paddlePos[1, 1];
+            }
+        }
     }
 }

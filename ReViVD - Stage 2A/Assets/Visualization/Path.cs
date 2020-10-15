@@ -8,7 +8,7 @@ namespace Revivd {
         public List<Atom> atoms = new List<Atom>();
 
         public Dictionary<int, float> specialRadii = new Dictionary<int, float>();
-        public float baseRadius = 0.1f;
+        public float baseRadius = 0.01f;
         
         public bool needsMeshUpdate = false; //Rebuild the whole mesh from scratch
 
@@ -211,7 +211,7 @@ namespace Revivd {
                 }
                 return;
             }
-
+            
             if (viz.useGlobalTime) {
                 timeSphereDropped = false;
                 timeSphereTime = viz.globalTime;
@@ -230,6 +230,7 @@ namespace Revivd {
             }
 
         }
+
 
         private void UpdateTimeSpherePosition() {
             var it = atoms.GetEnumerator();

@@ -6,9 +6,38 @@ using System;
 using Newtonsoft.Json;
 using System.Globalization;
 
+
+// The Main Class responsible for the visualization in the scene
+
 namespace Revivd {
     public class Visualization : MonoBehaviour {
+        
+        /**
+         *paths : List of type Path that contains all the paths loaded from the binary file
+         * displayedPaths : List of type Path that contains the displayed paths currently in the scene
+         * hiddenPaths : List of type Path that contains the hidden paths
+         * paths = displayedPaths U hiddenPaths
+         * playAnim : reference for the class PlayerAnimation
+         * ballAnim : reference for the class BallAnimation
+         * vidAnim : reference for the class videoAnimation
+         * PlayersecondsBetweenUpdates : float that represents the delai between every two drawing of the players
+         * BallsecondsBetweenUpdates : float that represents the delai between every two mouvement of the ball in a trajectory
+         * animationShow : bool to check if the drawn players are being drawn or not
+         * videoShow : bool to check if the video is playing or not
+         */
+
         public List<Path> paths;
+        public List<Path> displayedPaths;
+        public List<Path> hiddenPaths;
+
+        private PlayerAnimation playAnim;
+        private BallAnimation ballAnim;
+        private VideoAnimation vidAnim;
+        private ControlPanel contPan;
+        private float PlayersecondsBetweenUpdates = 0.1f;
+        private float BallsecondsBetweenUpdates = 0.1f;
+        private bool animationShow = false;
+        private bool videoShow = false;
 
         public int GetPathIndex(string name) {
             int c = paths.Count;
@@ -23,7 +52,6 @@ namespace Revivd {
         public static Visualization Instance { get { return _instance; } }
 
         public Vector3 districtSize;
-
         public Material material;
 
         //DEBUG
@@ -66,11 +94,11 @@ namespace Revivd {
                 _loaded = true;
             }
 
-            ControlPanel.JsonData data = ControlPanel.Instance.data;
+            ControlPanel.JsonData data = contPan.data;
 
+            // update the data in the scene from the .json 
             districtSize = ControlPanel.LDVector3_to_Vector3(data.districtSize);
             CreateDistricts();
-
             displayTimeSpheres = data.spheresDisplay;
             globalTime = data.spheresGlobalTime;
             timeSphereRadius = data.spheresRadius;
@@ -81,6 +109,8 @@ namespace Revivd {
             foreach (Transform child in this.transform)
                 Destroy(child.gameObject);
             paths.Clear();
+            displayedPaths.Clear();
+            hiddenPaths.Clear();
             districts.Clear();
             clearDistrictsToHighlight = true;
 
@@ -184,6 +214,7 @@ namespace Revivd {
         public bool displayTimeSpheres = false;
 
         public float globalTime = 0;
+        public float globalTimeForAnimation = 0;
 
         public bool useGlobalTime = true;
 
@@ -279,6 +310,7 @@ namespace Revivd {
 
             old_timeSphereRadius = timeSphereRadius;
             old_traceTimeSpheres = traceTimeSpheres;
+
         }
 
         void Update() {
@@ -324,7 +356,7 @@ namespace Revivd {
 
                 if (useGlobalTime && doTimeSphereAnimation) {
                     globalTime += timeSphereAnimationSpeed * Time.deltaTime;
-                    ControlPanel.Instance.spheres.globalTime.text = globalTime.ToString();
+                    contPan.spheres.globalTime.text = globalTime.ToString();
                 }
 
             }
@@ -332,6 +364,38 @@ namespace Revivd {
             foreach (Path p in paths) {
                 p.UpdateTimeSphere();
             }
+
+            // reset the animations when they are finished
+            if (playAnim.finished && ballAnim.finished) { 
+                playAnim.p1Counter = 0;
+                playAnim.p2Counter = 0;
+                ballAnim.iterator = 0;
+                playAnim.finished = false;
+                ballAnim.finished = false;
+                StartCoroutine(StartPlayerBallAnimations(PlayersecondsBetweenUpdates, BallsecondsBetweenUpdates));
+            }
+
+            if (contPan.playerAnimSettings.gameObject.activeInHierarchy == false) {
+                if (playAnim.loaded) {
+                    contPan.playerAnimSettings.gameObject.SetActive(true);
+                    contPan.playerAnimSettings.player1Anim.SetActive(false);
+                    contPan.playerAnimSettings.player2Anim.SetActive(false);
+                    if (playAnim.p1ChildrenLines.Count != 0) {
+                        contPan.playerAnimSettings.player1Anim.SetActive(true);
+                        contPan.InitiateAnimationUIValues(1);
+                    }
+                    if (playAnim.p2ChildrenLines.Count != 0) {
+                        contPan.playerAnimSettings.player2Anim.SetActive(true);
+                        contPan.InitiateAnimationUIValues(2);
+                    }
+                }
+            }
+            else {
+                if (!playAnim.loaded) {
+                    contPan.playerAnimSettings.gameObject.SetActive(false);
+                }
+            }
+            
 
             if (debugMode) {
                 if (clearDistrictsToHighlight) {
@@ -374,7 +438,12 @@ namespace Revivd {
         bool LoadFromFile() {
             Tools.StartClock();
 
-            ControlPanel.JsonData data = ControlPanel.Instance.data;
+            
+            playAnim = PlayerAnimation.Instance;
+            ballAnim = BallAnimation.Instance;
+            vidAnim = VideoAnimation.Instance;
+            contPan = ControlPanel.Instance;
+            ControlPanel.JsonData data = contPan.data;
 
             int n_of_bytes_per_atom = 0;   //number of bytes that atom attributes take per atom
             int n_of_atomAttributes = data.atomAttributes.Length;
@@ -742,10 +811,103 @@ namespace Revivd {
                 }
             }
 
+            UpdateDisp_and_Hidd_Paths(paths, new List<Path>());
+
             Tools.EndClock("Loaded paths");
 
+            animationShow = false;
+
+            if (data.CSVfilesPath == null || data.CSVfilesPath.Split(' ').Length - 1 == data.CSVfilesPath.Length) {
+                animationShow = false;
+            }
+            else {
+                playAnim.CSVfilesPath = data.CSVfilesPath;
+                animationShow = true;
+            }
+
+            if (animationShow) {
+                PlayersecondsBetweenUpdates = data.playersecondsBetweenUpdates;
+                BallsecondsBetweenUpdates = data.ballsecondsBetweenUpdates;
+
+                int maxPlayers = data.playerAnimationAttributes.Length;
+
+                playAnim.p1Colors = new Color[2];
+                playAnim.p2Colors = new Color[2];
+                playAnim.linesWidth = new float[maxPlayers];
+
+                for (int i = 0; i < maxPlayers; i++) {
+                    if (i == 0) {
+                        playAnim.p1Colors[0] = ControlPanel.LDColor_to_Color(data.playerAnimationAttributes[i].colorStart);
+                        playAnim.p1Colors[1] = ControlPanel.LDColor_to_Color(data.playerAnimationAttributes[i].colorEnd);
+                    }
+                    else {
+                        playAnim.p2Colors[0] = ControlPanel.LDColor_to_Color(data.playerAnimationAttributes[i].colorStart);
+                        playAnim.p2Colors[1] = ControlPanel.LDColor_to_Color(data.playerAnimationAttributes[i].colorEnd);
+                    }
+                    playAnim.linesWidth[i] = data.playerAnimationAttributes[i].widthMultiplier;
+                    playAnim.posOffset[i] = ControlPanel.LDVector3_to_Vector3(data.playerAnimationAttributes[i].posOffset)/100;
+                    playAnim.showPaddle[i] = data.playerAnimationAttributes[i].showPaddle;
+                    playAnim.paddlePos[i, 0] = data.playerAnimationAttributes[i].paddlePos1;
+                    playAnim.paddlePos[i, 1] = data.playerAnimationAttributes[i].paddlePos2;
+                }
+
+                GameObject table = GameObject.Find("Table");
+                if (table != null) {
+                    table.AddComponent<BoxCollider>();
+                }
+                else {
+                    Debug.LogWarning("Can't display ball's projection: Couldn't find a gameObject named Table");
+                }
+
+                videoShow = false;
+
+                if (data.VideoFilesPath == null || data.VideoFilesPath.Split(' ').Length - 1 == data.VideoFilesPath.Length) {
+                    videoShow = false;
+                }
+                else {
+                    vidAnim.videoFilesPath = data.VideoFilesPath;
+                    videoShow = true;
+                }
+            }
+            
             return true;
         }
 
+
+        // Update the displayed and hidden Paths Lists used in the visualization
+        // Mainly called when the paths are first loaded, a selection has been applied, inversion of selection, reset/hardreset
+        public void UpdateDisp_and_Hidd_Paths(List<Path> displayed, List<Path> hidden) {
+            displayedPaths = displayed;
+            hiddenPaths = hidden;
+            contPan.playerAnimSettings.gameObject.SetActive(false);
+            StopAllCoroutines();
+            
+            if (animationShow) {
+                playAnim.Load(displayedPaths, GetPathIndex(displayedPaths[0].name));
+                ballAnim.Load(displayedPaths);
+
+                if (videoShow) {
+                    VideoAnimation.Instance.GetVideo(GetPathIndex(displayedPaths[0].name));
+                }
+                
+                if (PlayersecondsBetweenUpdates <= 0) {
+                    Debug.LogError("Time between Players' animation update is not valid value");
+                    return;
+                }
+                if (BallsecondsBetweenUpdates <= 0) {
+                    Debug.LogError("Time between Ball's animation update is not valid value");
+                    return;
+                }
+                
+                StartCoroutine(StartPlayerBallAnimations(PlayersecondsBetweenUpdates, BallsecondsBetweenUpdates));
+            }
+        }
+
+        // starts the animations simultaneously using Coroutines
+        IEnumerator StartPlayerBallAnimations(float PlayersecondsBetweenUpdates, float BallsecondsBetweenUpdates) {
+            yield return new WaitForSecondsRealtime(0.1f);
+            StartCoroutine(playAnim.DrawLines(PlayersecondsBetweenUpdates));
+            StartCoroutine(ballAnim.MoveBallPosition(BallsecondsBetweenUpdates));
+        }
     }
 }

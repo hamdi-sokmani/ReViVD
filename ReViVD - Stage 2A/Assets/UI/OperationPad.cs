@@ -58,11 +58,15 @@ namespace Revivd {
         }
 
         void ResetDisplayedPaths() {
-            foreach (Path p in Visualization.Instance.paths) {
+
+            Visualization viz = Visualization.Instance;
+
+            foreach (Path p in viz.paths) {
                 foreach (Atom a in p.atoms) {
                     a.ShouldDisplayBecauseSelected = true;
                 }
             }
+        
             if (SelectorManager.Instance.InverseMode) { //Hard reset
                 for (int i = 0; i < SelectorManager.colors.Length; i++) {
                     SelectorManager.Instance.ClearSelected((SelectorManager.ColorGroup)i);
@@ -71,6 +75,8 @@ namespace Revivd {
             }
             else
                 Logger.Instance?.LogEvent("RESET");
+
+            viz.UpdateDisp_and_Hidd_Paths(viz.paths, new System.Collections.Generic.List<Path>());
         }
 
         void ToggleLogicOperation() {

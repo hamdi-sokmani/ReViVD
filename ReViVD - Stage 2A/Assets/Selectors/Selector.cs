@@ -81,6 +81,7 @@ namespace Revivd {
             HashSet<Atom> selectedRibbons = SelectorManager.Instance.selectedRibbons[(int)Color];
 
             foreach (SelectorPart p in parts) {
+                //Debug.Log("juhiuhiu");
                 if (needsCheckedHighlightCleanup) {
                     needsCheckedHighlightCleanup = false;
                     foreach (Atom a in p.RibbonsToCheck)

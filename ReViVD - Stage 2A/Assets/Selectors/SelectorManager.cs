@@ -174,12 +174,15 @@ namespace Revivd {
 
         public void DoLogicOperation() {
             Visualization viz = Visualization.Instance;
-
+            
+           
             if (InverseMode) { // Invert displayed ribbons
                 foreach (Path p in viz.paths) {
                     foreach (Atom a in p.atoms)
                         a.ShouldDisplayBecauseSelected = !a.ShouldDisplayBecauseSelected;
                 }
+               
+                viz.UpdateDisp_and_Hidd_Paths(viz.hiddenPaths, viz.displayedPaths);
 
                 Logger.Instance?.LogEvent("OP_INV");
 
@@ -187,6 +190,7 @@ namespace Revivd {
             }
 
             HashSet<Path> pathsToKeep = new HashSet<Path>();
+
             if (operationMode == LogicMode.AND) {
                 bool firstPass = true;
                 foreach (ColorGroup c in operatingColors) {
@@ -220,6 +224,8 @@ namespace Revivd {
                 foreach (Atom a in p.atoms)
                     a.ShouldDisplayBecauseSelected = false;
             }
+            
+            viz.UpdateDisp_and_Hidd_Paths(new List<Path>(pathsToKeep), new List<Path>(pathsToRemove));
 
             Logger.Instance?.LogOperation(pathsToKeep.Count);
         }
@@ -230,10 +236,11 @@ namespace Revivd {
                     a.ShouldHighlightBecauseSelected((int)color, false);
             }
             selectedRibbons[(int)color].Clear();
+            
         }
 
         private void OnEnable() {
-            SteamVR_ControllerManager.RightController.Gripped += SelectWithPersistents;
+    
             SteamVR_ControllerManager.RightController.MenuButtonClicked += MakePersistentCopyOfHand;
             SteamVR_ControllerManager.LeftController.MenuButtonClicked += ChangeControlMode;
         }
